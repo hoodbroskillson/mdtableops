@@ -114,8 +114,9 @@ function asBuffer(bytes: string | Buffer): Buffer {
 async function destMatchesOriginal(
   ops: FsOps,
   filePath: string,
-  original: Buffer,
+  original: Buffer | undefined,
 ): Promise<boolean> {
+  if (!original) return false;
   try {
     const bytes = await ops.readFile(filePath);
     return asBuffer(bytes).equals(original);
@@ -132,31 +133,11 @@ function atomicReplaceError(filePath: string, err: unknown, originalUnchanged: b
   return new AppError(msg, EXIT.error, { file: filePath });
 }
 
-async function restoreDestFromBak(
-  ops: FsOps,
-  filePath: string,
-  bak: string,
-  original: Buffer,
-): Promise<void> {
-  try {
-    let bytes = original;
-    try {
-      bytes = asBuffer(await ops.readFile(bak));
-    } catch {
-      bytes = original;
-    }
-    await ops.writeFile(filePath, bytes);
-    await ops.unlink(bak).catch(() => undefined);
-  } catch {
-    // Leave bak in place if dest could not be restored.
-  }
-}
-
 /**
  * Atomic replace: write a temp file in the same directory, then rename.
- * On Windows, if rename fails: copy dest to a sibling .bak, unlink dest,
- * rename tmp onto dest, then unlink the bak. If anything after the backup
- * fails, dest is restored from the bak when possible.
+ * On Windows, if rename fails: rename dest to a sibling .bak (if that fails,
+ * dest is still intact). Then rename tmp onto dest; if that fails, restore
+ * bak onto dest and throw. Unlink bak only after a successful replace.
  * The error message claims the original is unchanged only when dest still
  * exists with the original bytes.
  */
@@ -191,23 +172,31 @@ export async function atomicWriteFile(
   let original: Buffer | undefined;
   try {
     original = asBuffer(await ops.readFile(filePath));
-    await ops.writeFile(bak, original);
-  } catch (backupErr) {
-    await ops.unlink(tmp).catch(() => undefined);
-    await ops.unlink(bak).catch(() => undefined);
-    const unchanged =
-      original !== undefined && (await destMatchesOriginal(ops, filePath, original));
-    throw atomicReplaceError(filePath, backupErr, unchanged);
+  } catch {
+    original = undefined;
   }
 
   try {
-    await ops.unlink(filePath);
+    await ops.rename(filePath, bak);
+  } catch (bakErr) {
+    await ops.unlink(tmp).catch(() => undefined);
+    throw atomicReplaceError(filePath, bakErr, await destMatchesOriginal(ops, filePath, original));
+  }
+
+  try {
     await ops.rename(tmp, filePath);
   } catch (replaceErr) {
-    await restoreDestFromBak(ops, filePath, bak, original);
+    try {
+      await ops.rename(bak, filePath);
+    } catch {
+      // Leave bak in place if dest could not be restored.
+    }
     await ops.unlink(tmp).catch(() => undefined);
-    const unchanged = await destMatchesOriginal(ops, filePath, original);
-    throw atomicReplaceError(filePath, replaceErr, unchanged);
+    throw atomicReplaceError(
+      filePath,
+      replaceErr,
+      await destMatchesOriginal(ops, filePath, original),
+    );
   }
 
   await ops.unlink(bak).catch(() => undefined);

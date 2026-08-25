@@ -87,6 +87,31 @@ describe("atomicWriteFile", () => {
       expect((await fs.readFile(file)).toString()).toBe("original");
     });
   });
+  it("win32 first rename fail then later renames succeed", async () => {
+    await withTempDir(async (dir) => {
+      const file = await writeMd(dir, "t.md", "old");
+      let renamed = 0;
+      const ops: FsOps = {
+        lstat: fs.lstat,
+        readFile: fs.readFile,
+        writeFile: fs.writeFile,
+        realpath: fs.realpath,
+        unlink: fs.unlink,
+        rename: async (a, b) => {
+          renamed += 1;
+          if (renamed === 1) {
+            const err = new Error("eexist") as NodeJS.ErrnoException;
+            err.code = "EEXIST";
+            throw err;
+          }
+          return fs.rename(a, b);
+        },
+      };
+      await atomicWriteFile(file, Buffer.from("new"), ops, "win32");
+      expect((await fs.readFile(file)).toString()).toBe("new");
+      expect(renamed).toBe(3);
+    });
+  });
   it("leaves the original intact when posix rename fails", async () => {
     await withTempDir(async (dir) => {
       const file = await writeMd(dir, "t.md", "original");
@@ -97,21 +122,48 @@ describe("atomicWriteFile", () => {
       expect((await fs.readFile(file)).toString()).toBe("original");
     });
   });
-  it("does not claim original unchanged if dest cannot be restored", async () => {
+  it("restores dest from bak if win32 tmp rename retry fails", async () => {
     await withTempDir(async (dir) => {
       const file = await writeMd(dir, "t.md", "original");
-      let writes = 0;
+      let renamed = 0;
       const ops: FsOps = {
         lstat: fs.lstat,
         readFile: fs.readFile,
+        writeFile: fs.writeFile,
         realpath: fs.realpath,
         unlink: fs.unlink,
-        writeFile: async (p, d) => {
-          writes += 1;
-          if (writes <= 2) return fs.writeFile(p, d);
-          throw new Error("restore failed");
+        rename: async (a, b) => {
+          renamed += 1;
+          if (renamed === 1 || renamed === 3) {
+            const err = new Error("simulated rename failure") as NodeJS.ErrnoException;
+            err.code = "EPERM";
+            throw err;
+          }
+          return fs.rename(a, b);
         },
-        rename: async () => {
+      };
+      try {
+        await atomicWriteFile(file, Buffer.from("mutated"), ops, "win32");
+        throw new Error("expected throw");
+      } catch (e) {
+        expect((e as Error).message).toMatch(/atomic replace failed \(original file unchanged\)/);
+      }
+      expect((await fs.readFile(file)).toString()).toBe("original");
+    });
+  });
+  it("does not claim original unchanged if dest cannot be restored", async () => {
+    await withTempDir(async (dir) => {
+      const file = await writeMd(dir, "t.md", "original");
+      let renamed = 0;
+      const ops: FsOps = {
+        lstat: fs.lstat,
+        readFile: fs.readFile,
+        writeFile: fs.writeFile,
+        realpath: fs.realpath,
+        unlink: fs.unlink,
+        rename: async (a, b) => {
+          renamed += 1;
+          if (renamed === 2) return fs.rename(a, b);
           const err = new Error("simulated rename failure") as NodeJS.ErrnoException;
           err.code = "EPERM";
           throw err;

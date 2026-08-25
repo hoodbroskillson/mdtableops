@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Windows `atomicWriteFile` no longer unlinks the destination before a replace that can still fail. Dest is copied to a sibling `.bak` first and restored if the retry fails. The error message claims the original is unchanged only when dest still exists with the original bytes.
+- Windows `atomicWriteFile` no longer unlinks the destination before a replace that can still fail. On rename failure dest is moved to a sibling `.bak`, tmp is renamed onto dest, and bak is restored if the retry fails. The error message claims the original is unchanged only when dest still exists with the original bytes.
 
 ### 1.0.0
 

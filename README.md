@@ -98,7 +98,7 @@ Tables inside fenced code (backticks or tildes, including info strings) are igno
 - 6 validation failed
 - 7 FILE is a symlink and `--follow-symlinks` was not set
 
-Writes are atomic: a temp file is created in the same directory, then renamed into place (on Windows, unlink-then-rename if needed). Default: refuse symlink files.
+Writes are atomic: a temp file is created in the same directory, then renamed into place. On Windows, if that rename cannot replace the destination, the original is moved aside to a sibling `.bak` and restored if the swap fails. Default: refuse symlink files.
 
 ## Library
 

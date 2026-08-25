@@ -95,4 +95,4 @@ Any error diagnostic → exit 6. Duplicate header names emit a warning but are n
 
 The rewritten table uses the FILE’s first newline convention (CRLF, LF, or CR). Bytes outside `[startOffset, endOffset)` are copied unchanged.
 
-Replace is: write `.<name>.mdtableops-<pid>-<rand>.tmp` in the same directory, then `rename`. On Windows, unlink the destination and rename if the first rename fails.
+Replace is: write `.<name>.mdtableops-<pid>-<rand>.tmp` in the same directory, then `rename`. On Windows, if replace fails, rename the destination to a sibling `.bak`, retry, and restore the `.bak` if the second rename fails. Unlink `.bak` only on success.

@@ -1,0 +1,57 @@
+{
+  "name": "mdtableops",
+  "version": "1.0.0",
+  "description": "Safe CRUD operations for Markdown tables, built for AI agents.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "license": "MIT",
+  "author": "hoodbroskillson",
+  "engines": {
+    "node": ">=20"
+  },
+  "keywords": [
+    "markdown",
+    "gfm",
+    "table",
+    "cli",
+    "crud",
+    "agents",
+    "llm"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/hoodbroskillson/mdtableops.git"
+  },
+  "bugs": {
+    "url": "https://github.com/hoodbroskillson/mdtableops/issues"
+  },
+  "homepage": "https://github.com/hoodbroskillson/mdtableops#readme",
+  "files": [
+    "dist",
+    "LICENSE",
+    "README.md"
+  ],
+  "devDependencies": {
+    "@types/node": "^20.17.0",
+    "@vitest/coverage-v8": "^2.1.0",
+    "typescript": "^5.6.0",
+    "vitest": "^2.1.0"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "bin": {
+    "mdtableops": "./dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "vitest run --coverage",
+    "test:watch": "vitest",
+    "lint": "tsc -p tsconfig.json --noEmit",
+    "prepack": "tsc -p tsconfig.json"
+  }
+}
